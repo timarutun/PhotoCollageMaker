@@ -27,8 +27,13 @@ class MainViewController: UIViewController {
         collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: layout)
         collectionView.delegate = self
         collectionView.dataSource = self
-        collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cell")
         collectionView.backgroundColor = .white
+        collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cell")
+
+        // Enable drag and drop functionality
+        collectionView.dragInteractionEnabled = true
+        collectionView.dragDelegate = self
+        collectionView.dropDelegate = self
 
         view.addSubview(collectionView)
     }
@@ -46,6 +51,7 @@ class MainViewController: UIViewController {
     }
 }
 
+// MARK: - UICollectionView DataSource & Delegate
 extension MainViewController: UICollectionViewDelegate, UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return selectedPhotos.count
@@ -65,6 +71,36 @@ extension MainViewController: UICollectionViewDelegate, UICollectionViewDataSour
     }
 }
 
+// MARK: - Drag & Drop Delegates
+extension MainViewController: UICollectionViewDragDelegate, UICollectionViewDropDelegate {
+    // Handle drag initiation
+    func collectionView(_ collectionView: UICollectionView, itemsForBeginning session: UIDragSession, at indexPath: IndexPath) -> [UIDragItem] {
+        let item = selectedPhotos[indexPath.item]
+        let itemProvider = NSItemProvider(object: item)
+        let dragItem = UIDragItem(itemProvider: itemProvider)
+        dragItem.localObject = item
+        return [dragItem]
+    }
+
+    // Handle drop operation
+    func collectionView(_ collectionView: UICollectionView, performDropWith coordinator: UICollectionViewDropCoordinator) {
+        guard let destinationIndexPath = coordinator.destinationIndexPath else { return }
+        if let item = coordinator.items.first, let sourceIndexPath = item.sourceIndexPath {
+            collectionView.performBatchUpdates {
+                let movedPhoto = selectedPhotos.remove(at: sourceIndexPath.item)
+                selectedPhotos.insert(movedPhoto, at: destinationIndexPath.item)
+                collectionView.moveItem(at: sourceIndexPath, to: destinationIndexPath)
+            }
+            coordinator.drop(item.dragItem, toItemAt: destinationIndexPath)
+        }
+    }
+
+    func collectionView(_ collectionView: UICollectionView, canHandle session: UIDropSession) -> Bool {
+        return session.canLoadObjects(ofClass: UIImage.self)
+    }
+}
+
+// MARK: - UIImagePickerController Delegate
 extension MainViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
         if let image = info[.originalImage] as? UIImage {
@@ -78,6 +114,3 @@ extension MainViewController: UIImagePickerControllerDelegate, UINavigationContr
         picker.dismiss(animated: true)
     }
 }
-
-
-
