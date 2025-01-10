@@ -30,10 +30,14 @@ class MainViewController: UIViewController {
         collectionView.backgroundColor = .white
         collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cell")
 
-        // Enable drag and drop functionality
+        // Enable drag & drop
         collectionView.dragInteractionEnabled = true
         collectionView.dragDelegate = self
         collectionView.dropDelegate = self
+
+        // Add long-press gesture for deletion
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
+        collectionView.addGestureRecognizer(longPressGesture)
 
         view.addSubview(collectionView)
     }
@@ -49,9 +53,25 @@ class MainViewController: UIViewController {
         picker.sourceType = .photoLibrary
         present(picker, animated: true)
     }
+
+    // Long-press handler for deleting photos
+    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        let location = gesture.location(in: collectionView)
+        if let indexPath = collectionView.indexPathForItem(at: location) {
+            // Confirm deletion
+            let alert = UIAlertController(title: "Delete Photo", message: "Are you sure you want to delete this photo?", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            alert.addAction(UIAlertAction(title: "Delete", style: .destructive, handler: { _ in
+                self.selectedPhotos.remove(at: indexPath.item)
+                self.collectionView.deleteItems(at: [indexPath])
+            }))
+            present(alert, animated: true)
+        }
+    }
 }
 
-// MARK: - UICollectionView DataSource & Delegate
+// MARK: - UICollectionView Delegate & DataSource
 extension MainViewController: UICollectionViewDelegate, UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return selectedPhotos.count
@@ -73,7 +93,6 @@ extension MainViewController: UICollectionViewDelegate, UICollectionViewDataSour
 
 // MARK: - Drag & Drop Delegates
 extension MainViewController: UICollectionViewDragDelegate, UICollectionViewDropDelegate {
-    // Handle drag initiation
     func collectionView(_ collectionView: UICollectionView, itemsForBeginning session: UIDragSession, at indexPath: IndexPath) -> [UIDragItem] {
         let item = selectedPhotos[indexPath.item]
         let itemProvider = NSItemProvider(object: item)
@@ -82,7 +101,6 @@ extension MainViewController: UICollectionViewDragDelegate, UICollectionViewDrop
         return [dragItem]
     }
 
-    // Handle drop operation
     func collectionView(_ collectionView: UICollectionView, performDropWith coordinator: UICollectionViewDropCoordinator) {
         guard let destinationIndexPath = coordinator.destinationIndexPath else { return }
         if let item = coordinator.items.first, let sourceIndexPath = item.sourceIndexPath {
@@ -93,10 +111,6 @@ extension MainViewController: UICollectionViewDragDelegate, UICollectionViewDrop
             }
             coordinator.drop(item.dragItem, toItemAt: destinationIndexPath)
         }
-    }
-
-    func collectionView(_ collectionView: UICollectionView, canHandle session: UIDropSession) -> Bool {
-        return session.canLoadObjects(ofClass: UIImage.self)
     }
 }
 
