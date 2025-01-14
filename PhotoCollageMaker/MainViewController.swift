@@ -7,9 +7,15 @@
 
 import UIKit
 
+// Struct to store photo and its caption
+struct Photo {
+    let image: UIImage
+    let caption: String
+}
+
 class MainViewController: UIViewController {
     private var collectionView: UICollectionView!
-    private var selectedPhotos: [UIImage] = []
+    private var selectedPhotos: [Photo] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -20,7 +26,7 @@ class MainViewController: UIViewController {
 
     private func setupCollectionView() {
         let layout = UICollectionViewFlowLayout()
-        layout.itemSize = CGSize(width: 100, height: 100)
+        layout.itemSize = CGSize(width: 100, height: 120) // Increased height for caption
         layout.minimumLineSpacing = 10
         layout.minimumInteritemSpacing = 10
 
@@ -29,15 +35,6 @@ class MainViewController: UIViewController {
         collectionView.dataSource = self
         collectionView.backgroundColor = .white
         collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cell")
-
-        // Enable drag & drop
-        collectionView.dragInteractionEnabled = true
-        collectionView.dragDelegate = self
-        collectionView.dropDelegate = self
-
-        // Add long-press gesture for deletion
-        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
-        collectionView.addGestureRecognizer(longPressGesture)
 
         view.addSubview(collectionView)
     }
@@ -54,20 +51,18 @@ class MainViewController: UIViewController {
         present(picker, animated: true)
     }
 
-    // Long-press handler for deleting photos
-    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-        guard gesture.state == .began else { return }
-        let location = gesture.location(in: collectionView)
-        if let indexPath = collectionView.indexPathForItem(at: location) {
-            // Confirm deletion
-            let alert = UIAlertController(title: "Delete Photo", message: "Are you sure you want to delete this photo?", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-            alert.addAction(UIAlertAction(title: "Delete", style: .destructive, handler: { _ in
-                self.selectedPhotos.remove(at: indexPath.item)
-                self.collectionView.deleteItems(at: [indexPath])
-            }))
-            present(alert, animated: true)
+    private func promptForCaption(image: UIImage) {
+        let alert = UIAlertController(title: "Add Caption", message: "Enter a caption for the photo", preferredStyle: .alert)
+        alert.addTextField { textField in
+            textField.placeholder = "Caption"
         }
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Add", style: .default, handler: { [weak self] _ in
+            guard let caption = alert.textFields?.first?.text else { return }
+            self?.selectedPhotos.append(Photo(image: image, caption: caption))
+            self?.collectionView.reloadData()
+        }))
+        present(alert, animated: true)
     }
 }
 
@@ -82,35 +77,25 @@ extension MainViewController: UICollectionViewDelegate, UICollectionViewDataSour
         for subview in cell.contentView.subviews {
             subview.removeFromSuperview()
         }
-        let imageView = UIImageView(image: selectedPhotos[indexPath.item])
+
+        let photo = selectedPhotos[indexPath.item]
+
+        // Add image view
+        let imageView = UIImageView(image: photo.image)
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.frame = cell.contentView.bounds
+        imageView.frame = CGRect(x: 0, y: 0, width: cell.contentView.bounds.width, height: 100)
         cell.contentView.addSubview(imageView)
+
+        // Add label for caption
+        let label = UILabel(frame: CGRect(x: 0, y: 100, width: cell.contentView.bounds.width, height: 20))
+        label.text = photo.caption
+        label.font = UIFont.systemFont(ofSize: 12)
+        label.textAlignment = .center
+        label.textColor = .darkGray
+        cell.contentView.addSubview(label)
+
         return cell
-    }
-}
-
-// MARK: - Drag & Drop Delegates
-extension MainViewController: UICollectionViewDragDelegate, UICollectionViewDropDelegate {
-    func collectionView(_ collectionView: UICollectionView, itemsForBeginning session: UIDragSession, at indexPath: IndexPath) -> [UIDragItem] {
-        let item = selectedPhotos[indexPath.item]
-        let itemProvider = NSItemProvider(object: item)
-        let dragItem = UIDragItem(itemProvider: itemProvider)
-        dragItem.localObject = item
-        return [dragItem]
-    }
-
-    func collectionView(_ collectionView: UICollectionView, performDropWith coordinator: UICollectionViewDropCoordinator) {
-        guard let destinationIndexPath = coordinator.destinationIndexPath else { return }
-        if let item = coordinator.items.first, let sourceIndexPath = item.sourceIndexPath {
-            collectionView.performBatchUpdates {
-                let movedPhoto = selectedPhotos.remove(at: sourceIndexPath.item)
-                selectedPhotos.insert(movedPhoto, at: destinationIndexPath.item)
-                collectionView.moveItem(at: sourceIndexPath, to: destinationIndexPath)
-            }
-            coordinator.drop(item.dragItem, toItemAt: destinationIndexPath)
-        }
     }
 }
 
@@ -118,13 +103,16 @@ extension MainViewController: UICollectionViewDragDelegate, UICollectionViewDrop
 extension MainViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
         if let image = info[.originalImage] as? UIImage {
-            selectedPhotos.append(image)
-            collectionView.reloadData()
+            picker.dismiss(animated: true) { [weak self] in
+                self?.promptForCaption(image: image)
+            }
+        } else {
+            picker.dismiss(animated: true)
         }
-        picker.dismiss(animated: true)
     }
 
     func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
         picker.dismiss(animated: true)
     }
 }
+
