@@ -7,7 +7,6 @@
 
 import UIKit
 
-// Struct to store photo and its caption
 struct Photo {
     let image: UIImage
     let caption: String
@@ -26,16 +25,11 @@ class MainViewController: UIViewController {
 
     private func setupCollectionView() {
         let layout = UICollectionViewFlowLayout()
-        layout.itemSize = CGSize(width: 100, height: 120) // Increased height for caption
-        layout.minimumLineSpacing = 10
-        layout.minimumInteritemSpacing = 10
-
         collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: layout)
         collectionView.delegate = self
         collectionView.dataSource = self
         collectionView.backgroundColor = .white
         collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "cell")
-
         view.addSubview(collectionView)
     }
 
@@ -51,23 +45,18 @@ class MainViewController: UIViewController {
         present(picker, animated: true)
     }
 
-    private func promptForCaption(image: UIImage) {
-        let alert = UIAlertController(title: "Add Caption", message: "Enter a caption for the photo", preferredStyle: .alert)
-        alert.addTextField { textField in
-            textField.placeholder = "Caption"
-        }
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Add", style: .default, handler: { [weak self] _ in
-            guard let caption = alert.textFields?.first?.text else { return }
-            self?.selectedPhotos.append(Photo(image: image, caption: caption))
-            self?.collectionView.reloadData()
-        }))
-        present(alert, animated: true)
+    private func calculateCellSize() -> CGSize {
+        // Calculate grid dimensions
+        let itemsPerRow: CGFloat = CGFloat(ceil(sqrt(Double(selectedPhotos.count))))
+        let spacing: CGFloat = 10
+        let totalSpacing = (itemsPerRow - 1) * spacing
+        let cellSize = (view.bounds.width - totalSpacing) / itemsPerRow
+        return CGSize(width: cellSize, height: cellSize)
     }
 }
 
 // MARK: - UICollectionView Delegate & DataSource
-extension MainViewController: UICollectionViewDelegate, UICollectionViewDataSource {
+extension MainViewController: UICollectionViewDelegateFlowLayout, UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         return selectedPhotos.count
     }
@@ -84,18 +73,14 @@ extension MainViewController: UICollectionViewDelegate, UICollectionViewDataSour
         let imageView = UIImageView(image: photo.image)
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        imageView.frame = CGRect(x: 0, y: 0, width: cell.contentView.bounds.width, height: 100)
+        imageView.frame = cell.contentView.bounds
         cell.contentView.addSubview(imageView)
 
-        // Add label for caption
-        let label = UILabel(frame: CGRect(x: 0, y: 100, width: cell.contentView.bounds.width, height: 20))
-        label.text = photo.caption
-        label.font = UIFont.systemFont(ofSize: 12)
-        label.textAlignment = .center
-        label.textColor = .darkGray
-        cell.contentView.addSubview(label)
-
         return cell
+    }
+
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        return calculateCellSize()
     }
 }
 
@@ -103,16 +88,15 @@ extension MainViewController: UICollectionViewDelegate, UICollectionViewDataSour
 extension MainViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
         if let image = info[.originalImage] as? UIImage {
-            picker.dismiss(animated: true) { [weak self] in
-                self?.promptForCaption(image: image)
-            }
-        } else {
-            picker.dismiss(animated: true)
+            selectedPhotos.append(Photo(image: image, caption: ""))
+            collectionView.reloadData()
         }
+        picker.dismiss(animated: true)
     }
 
     func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
         picker.dismiss(animated: true)
     }
 }
+
 
