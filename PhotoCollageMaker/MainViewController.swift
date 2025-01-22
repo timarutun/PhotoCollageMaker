@@ -35,7 +35,10 @@ class MainViewController: UIViewController {
 
     private func setupNavigationBar() {
         navigationItem.title = "Photo Collage Maker"
-        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addPhoto))
+        navigationItem.rightBarButtonItems = [
+            UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(addPhoto)),
+            UIBarButtonItem(title: "Save", style: .plain, target: self, action: #selector(saveCollage))
+        ]
     }
 
     @objc private func addPhoto() {
@@ -45,8 +48,34 @@ class MainViewController: UIViewController {
         present(picker, animated: true)
     }
 
+    @objc private func saveCollage() {
+        guard !selectedPhotos.isEmpty else {
+            let alert = UIAlertController(title: "No Photos", message: "Add photos to create a collage before saving.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            present(alert, animated: true)
+            return
+        }
+
+        let renderer = UIGraphicsImageRenderer(size: collectionView.contentSize)
+        let image = renderer.image { context in
+            let savedOffset = collectionView.contentOffset
+            collectionView.contentOffset = .zero
+            collectionView.layer.render(in: context.cgContext)
+            collectionView.contentOffset = savedOffset
+        }
+
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(imageSaveCompletion(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+
+    @objc private func imageSaveCompletion(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        let alertTitle = (error == nil) ? "Saved!" : "Error"
+        let alertMessage = (error == nil) ? "Your collage has been saved to Photos." : "Unable to save collage."
+        let alert = UIAlertController(title: alertTitle, message: alertMessage, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
     private func calculateCellSize() -> CGSize {
-        // Calculate grid dimensions
         let itemsPerRow: CGFloat = CGFloat(ceil(sqrt(Double(selectedPhotos.count))))
         let spacing: CGFloat = 10
         let totalSpacing = (itemsPerRow - 1) * spacing
@@ -69,7 +98,6 @@ extension MainViewController: UICollectionViewDelegateFlowLayout, UICollectionVi
 
         let photo = selectedPhotos[indexPath.item]
 
-        // Add image view
         let imageView = UIImageView(image: photo.image)
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
